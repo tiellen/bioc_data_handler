@@ -285,7 +285,7 @@ def main():
     """
     Invoke this module as a script
     """
-    usage = "usage: %prog [options] input: directory of pubmed dump with abstract data(args[0]); output: brat directory (args[1])"
+    usage = "usage: %prog [options] input: bioc file path(args[0]); output: og xml output directory (args[1])"
     parser = OptionParser(version='%prog 0.99', usage=usage)
 
     parser.add_option('-l', '--logfile', dest='logfilename',
