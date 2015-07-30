@@ -101,7 +101,13 @@ class BioCCollectionHandler(object):
                 abstract_handler = self.pmid_abstracts_dict[options.pmid]
                 if not options.filename:
                     output_path = output_dir + '/' + abstract_handler.id + '_og.xml'
+                elif output_dir in options.filename:
+                    filename = options.filename.split('/')[-1]
+                    print 'FILENAME', filename
+                    output_path = output_dir + '/' + filename
+                    
                 else:
+                    'standard filename'
                     output_path = output_dir + '/' + options.filename
                     
                 og_writer = OG_XMLWriter(abstract_handler, output_path)
@@ -115,7 +121,12 @@ class BioCCollectionHandler(object):
                 
                 if not options.filename:
                     output_path = output_dir + '/' + abstract_handler.id + '_og.xml'
+                elif output_dir in options.filename:
+                    filename = options.filename.split('/')[-1]
+                    output_path = output_dir + '/' + filename
+                    
                 else:
+                    'standard filename'
                     output_path = output_dir + '/' + options.filename
                 
                 #print output_path, 'output_path'
@@ -297,12 +308,20 @@ def process(options=None, args=None):
 
     bioc_input = args[0]
     
-    print options.directory
-    
     if options.directory:
         og_xml_out_dir = options.directory
+    elif options.filename:
+        if options.filename.split('/') > 1:
+            og_xml_out_dir = '/'.join(options.filename.split('/')[:-1])
+            #options.filenname = '/'.join(options.filename.split('/')[-1])
+            
+        else: 
+            og_xml_out_dir = os.getcwd()
     else:
-        og_xml_out_dir = args[1]
+        try:
+            og_xml_out_dir = args[1]
+        except IndexError:
+            raise(Exception('Please define output location'))
         
     if not os.path.isdir(og_xml_out_dir):
         raise(Exception('Invalid Output Directory.'))
