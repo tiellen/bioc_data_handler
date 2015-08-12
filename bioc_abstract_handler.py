@@ -30,7 +30,11 @@ import sys
 
 sys.path.append('/home/user/ellendorff/additional_python/PyBioC-Jul10/src/')
 
-from bioc import BioCReader
+from bioc import BioCReader, BioCWriter
+
+from bioc import BioCCollection
+from bioc import BioCDocument
+from bioc import BioCPassage
 
 reload(sys)  
 sys.setdefaultencoding('utf8')
@@ -40,6 +44,21 @@ sys.setdefaultencoding('utf8')
 sys.stdout = codecs.getwriter('utf-8')(sys.__stdout__)
 sys.stderr = codecs.getwriter('utf-8')(sys.__stderr__)
 sys.stdin = codecs.getreader('utf-8')(sys.__stdin__)
+
+
+class DocIDGenerator:
+    '''Generates a temporal document id if input BioC document does not have id.'''
+    _counter = 0
+    _tid = None
+    
+    @classmethod
+    def get(cls):
+        cls._counter += 1
+        cls._tid = 'temp_id' + str(cls._counter)
+        
+        return cls._tid
+                
+    
 
     
 class BioCCollectionHandler(object):
@@ -70,12 +89,14 @@ class BioCCollectionHandler(object):
             bioc_doc = BioCAbstractHandler(one_document)
         
             document_list.append(bioc_doc)
-            
-        if options.filename and len(document_list) > 1:
-            if not options.pmid:
-                #print 'WARNING: more than one document in BioC file'
-                raise(Exception('More than one document in BioC file. Remove --filename option!'))
-        else: pass
+        
+        try: 
+            if options.filename and len(document_list) > 1:
+                if not options.pmid:
+                    #print 'WARNING: more than one document in BioC file'
+                    raise(Exception('More than one document in BioC file. Remove --filename option!'))
+            else: pass
+        except AttributeError: pass
 
         return document_list
         
@@ -99,6 +120,9 @@ class BioCCollectionHandler(object):
         if options.pmid:
             try:
                 abstract_handler = self.pmid_abstracts_dict[options.pmid]
+            except KeyError:
+                raise(Exception('Target Pubmed ID could not be found in BioC collection'))
+            else:
                 if not options.filename:
                     output_path = output_dir + '/' + abstract_handler.id + '_og.xml'
                 elif output_dir in options.filename:
@@ -113,8 +137,7 @@ class BioCCollectionHandler(object):
                 og_writer = OG_XMLWriter(abstract_handler, output_path)
                 og_writer.write()
                 
-            except KeyError:
-                raise(Exception('Target Pubmed ID could not be found in BioC collection'))
+            
         else:
              
             for abstract_handler in self.pmid_abstracts_dict.values():
@@ -132,6 +155,46 @@ class BioCCollectionHandler(object):
                 #print output_path, 'output_path'
                 og_writer = OG_XMLWriter(abstract_handler, output_path)
                 og_writer.write()
+                
+    def write_bioc_xml_files(self, output_dir, options=None, args=None):
+        if options:
+            if options.pmid:
+                try:
+                    abstract_handler = self.pmid_abstracts_dict[options.pmid]
+                except KeyError:
+                    raise(Exception('Target Pubmed ID could not be found in BioC collection'))
+                else:
+                    if not options.filename:
+                        output_path = output_dir + '/' + abstract_handler.id + '.bioc'
+                    elif output_dir in options.filename:
+                        filename = options.filename.split('/')[-1]
+                        print 'FILENAME', filename
+                        output_path = output_dir + '/' + filename
+                    
+                    else:
+                        output_path = output_dir + '/' + options.filename
+                        
+                    abstract_handler.write_text_bioc(output_path)
+
+            elif not options.pmid:
+             
+                for abstract_handler in self.pmid_abstracts_dict.values():
+                        if not options.filename:
+                            output_path = output_dir + '/' + abstract_handler.id + '.bioc'
+                        elif output_dir in options.filename:
+                            filename = options.filename.split('/')[-1]
+                            output_path = output_dir + '/' + filename
+                        else: output_path = output_dir + '/' + options.filename
+                    
+                        abstract_handler.write_text_bioc(output_path)       
+               
+        elif not options:
+             
+            for abstract_handler in self.pmid_abstracts_dict.values():
+                output_path = output_dir + '/' + abstract_handler.id + '.bioc'
+                abstract_handler.write_text_bioc(output_path)
+                
+                
         
         
 
@@ -142,6 +205,7 @@ class BioCAbstractHandler(object):
 
     def __init__(self, bioc_document, options=None, args=None):
     
+        self.document = bioc_document
         self.abstract_dict = self.parse_bioc_document(bioc_document)
         self.id = self.abstract_dict['pubmed_id']
         
@@ -157,11 +221,14 @@ class BioCAbstractHandler(object):
     	internal structure of the abstract'''
     
         abstract_dict = OrderedDict()
-    
-        if ':' in one_document.id:
-            one_docid = one_document.id.split(':')[1]
+        if not one_document.id == None:
+            if ':' in one_document.id:
+                one_docid = one_document.id.split(':')[1]
+            else: 
+                one_docid = one_document.id
         else: 
-            one_docid = one_document.id
+            one_docid = DocIDGenerator.get()
+            print 'NO DOC ID FOUND; generating temporal doc id: ', one_docid
             
         #print 'DOC ID:', one_docid
     
@@ -216,11 +283,29 @@ class BioCAbstractHandler(object):
         except (IndexError, KeyError, TypeError):
             return None
             
+    def write_text_bioc(self, output_path):
+        bioc_writer = BioCWriter(output_path)
+        bioc_collection = BioCCollection()
+        # Insert option for either writing text only or annotations?
+        # to keep document as it is:
+        #collection.add_document(self.document)
+        bioc_document = BioCDocument()
+        for passage in self.abstract_dict.keys():
+            bioc_passage = BioCPassage()
+            bioc_passage.text = self.abstract_dict[passage]
+            bioc_document.add_passage(bioc_passage)
+        bioc_collection.add_document(bioc_document)
+        
+        print 'BioC output path', output_path
+        bioc_writer.collection = bioc_collection
+        bioc_writer.write()
+        
+          
     def write_og_xml(self, output_path):
         og_writer = OG_XMLWriter(self, output_path)
         og_writer.write()
         
-            
+        
 class OG_XMLWriter(object):
 
     def __init__(self, bioc_abstract_handler, output_path, options=None, args=None):
@@ -328,7 +413,13 @@ def process(options=None, args=None):
     
     bioc_collection = BioCCollectionHandler(bioc_input, options=options, args=args)
     
-    bioc_collection.write_og_xml_files(og_xml_out_dir, options=options)
+    if options: 
+        if not options.bioc_file:
+            bioc_collection.write_og_xml_files(og_xml_out_dir, options=options)
+    
+        else:
+            output_dir = og_xml_out_dir
+            bioc_collection.write_bioc_xml_files(output_dir, options=options)
     
     #parse_bioc(bioc_input)
 
@@ -355,8 +446,11 @@ def main():
     parser.add_option('--directory',
                       action='store', type='string', dest='directory', default=False,
                       help='give a directory for output')
+    parser.add_option('-b', '--bioc_file',
+                      action='store_true', dest='bioc_file', default=False,
+                      help='Generate one BioC file for each BioC Document')
                       
-    parser.add_option('--pmid',
+    parser.add_option('-p','--pmid',
                       action='store', type='string', dest='pmid', default=False,
                       help='give a single pmid for which og xml should be generated (if more than one document in bioc file)')
 
