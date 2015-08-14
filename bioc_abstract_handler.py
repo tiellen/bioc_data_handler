@@ -149,7 +149,6 @@ class BioCCollectionHandler(object):
                     output_path = output_dir + '/' + filename
                     
                 else:
-                    'standard filename'
                     output_path = output_dir + '/' + options.filename
                 
                 #print output_path, 'output_path'
@@ -182,8 +181,13 @@ class BioCCollectionHandler(object):
                         if not options.filename:
                             output_path = output_dir + '/' + abstract_handler.id + '.bioc'
                         elif output_dir in options.filename:
-                            filename = options.filename.split('/')[-1]
-                            output_path = output_dir + '/' + filename
+                            if '/' in options.filename:
+                                filename = options.filename.split('/')[-1]
+                                output_path = output_dir + '/' + filename
+                            else:
+                                #output_path = os.getcwd() + '/' + filename
+                                output_path = output_dir + '/' + filename
+                            
                         else: output_path = output_dir + '/' + options.filename
                     
                         abstract_handler.write_text_bioc(output_path)       
